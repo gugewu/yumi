@@ -23,25 +23,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
 
-      # 2. 配置 Node.js
+      # 2. 配置 Node.js 环境（用于编译 WebUI）
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: '24'
-          
+
       # 3. 安装 WebUI 依赖
       - name: Install WebUI dependencies
         working-directory: ./webui
         run: npm install
 
-      # 4. 配置 Rust Nightly + Android 目标
+      # 4. 配置 Rust Nightly 工具链 + Android 目标 + rust-src
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@nightly
         with:
           targets: aarch64-linux-android
-          components: rust-src # build-std 需要
+          components: rust-src
 
       # 5. 安装 Android NDK
       - name: Setup Android NDK
@@ -56,18 +56,26 @@ jobs:
           echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
           cargo install cargo-ndk
 
-      # 7. 【新增】安装 bpf-linker 及系统依赖（LLVM/Clang）
-      - name: Install bpf-linker and system dependencies
+      # 7. 安装 bpf-linker（使用预编译二进制，绕过源码编译）
+      - name: Install bpf-linker via cargo-binstall
+        run: |
+          # 安装 cargo-binstall 工具
+          cargo install cargo-binstall
+          # 使用 binstall 直接下载预编译的 bpf-linker（避免 LLVM 版本问题）
+          cargo binstall -y bpf-linker
+
+      # 8. （可选）安装系统依赖（clang, lld, llvm）
+      #    如果 bpf-linker 预编译版本仍报错，可以尝试安装这些
+      - name: Install system dependencies (clang, lld)
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld llvm
-          cargo install bpf-linker
+          sudo apt-get install -y clang lld
 
-      # 8. 运行 xtask 构建（生成最终的 zip 包）
+      # 9. 运行 xtask 构建（生成最终的 zip 包）
       - name: Run xtask build
         run: cargo xtask build
 
-      # 9. 获取生成的 zip 文件名
+      # 10. 动态获取生成的 zip 文件名
       - name: Get Artifact Name
         id: artifact-name
         run: |
@@ -77,7 +85,7 @@ jobs:
           echo "name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
           echo "path=$FILE_PATH" >> $GITHUB_OUTPUT
 
-      # 10. 上传构建产物
+      # 11. 上传构建产物
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
         with:
