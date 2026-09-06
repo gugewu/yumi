@@ -40,7 +40,10 @@ fn build_ebpf() -> Result<PathBuf, Box<dyn std::error::Error>> {
         .current_dir(&ebpf_dir)
         .env_remove("RUSTUP_TOOLCHAIN")
         .env("PATH", add_path(&tools_bin)?)
-        .env("RUSTFLAGS", "-C opt-level=2")   // 强制使用 O2
+        // 关键修复：强制 bpf-linker 使用 O2 而不是 Oz
+        .env("BPF_LINKER_OPT_LEVEL", "2")
+        // RUSTFLAGS 保留，但实际起作用的是上面的环境变量
+        .env("RUSTFLAGS", "-C opt-level=2")
         .status()?;
 
     if !status.success() {
