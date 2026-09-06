@@ -38,11 +38,20 @@ use crate::monitor::app_detect;
 
 // ─── 常量 ────────────────────────────────────────────────
 
-/// uprobe 符号名（短签名）
-const SYMBOL_SHORT: &str = "_ZN7android7Surface11queueBufferEP19ANativeWindowBufferi";
-/// uprobe 符号名（长签名，fallback）
+// ========================================================
+// 修改点：将以下两个符号替换为 Android 17 实际导出的符号
+// ========================================================
+
+/// uprobe 符号名（首选）：BufferQueueProducer::queueBuffer（来自 nm -D 行号 4181）
+const SYMBOL_SHORT: &str =
+    "_ZN7android19BufferQueueProducer11queueBufferEiRKNS_22IGraphicBufferProducer16QueueBufferInputEPNS1_17QueueBufferOutputE";
+
+/// uprobe 符号名（备选）：Surface::queueBuffer（来自 nm -D 行号 2488）
 const SYMBOL_LONG: &str =
-    "_ZN7android7Surface11queueBufferEP19ANativeWindowBufferiPNS_24SurfaceQueueBufferOutputE";
+    "_ZN7android7Surface11queueBufferERKNS_2spINS_13GraphicBufferEEERKNS1_INS_5FenceEEEPNS_24SurfaceQueueBufferOutputE";
+
+// ========================================================
+
 const LIBGUI_PATH: &str = "/system/lib64/libgui.so";
 
 /// RingBuf 输出的帧时间戳事件（与 yumi-ebpf 的 FrameTimestampEvent 内存布局一致）
