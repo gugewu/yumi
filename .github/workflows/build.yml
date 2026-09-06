@@ -59,8 +59,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang lld
 
-      # 不需要 sed 修复了，因为 build.rs 已设置 RUSTFLAGS
-
       - name: Run xtask build
         run: cargo xtask build
 
