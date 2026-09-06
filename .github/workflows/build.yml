@@ -32,6 +32,7 @@ jobs:
         working-directory: ./webui
         run: npm install
 
+      # ---------- Rust 和 NDK ----------
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -49,19 +50,63 @@ jobs:
           echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
           cargo install cargo-ndk
 
-      - name: Install bpf-linker via cargo-binstall
+      # ---------- 缓存 ----------
+      - name: Cache Cargo registry and target
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            yumi-ebpf/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # ---------- 安装 bpf-linker 并修复 -Oz 问题 ----------
+      - name: Install bpf-linker and fix -Oz
         run: |
           cargo install cargo-binstall
           cargo binstall -y bpf-linker
 
+          # 找到 bpf-linker 路径
+          BPF_LINKER=$(which bpf-linker)
+          echo "原始 bpf-linker 位于: $BPF_LINKER"
+
+          # 创建 wrapper 脚本，替换 -Oz 为 -O2
+          cat > /tmp/bpf-linker-wrapper << 'EOF'
+          #!/bin/bash
+          args=()
+          for arg in "$@"; do
+            if [ "$arg" = "-Oz" ]; then
+              args+=("-O2")
+            else
+              args+=("$arg")
+            fi
+          done
+          exec /usr/local/bin/bpf-linker-real "${args[@]}"
+          EOF
+          chmod +x /tmp/bpf-linker-wrapper
+
+          # 重命名原文件，将 wrapper 放到 PATH 前面
+          sudo mv "$BPF_LINKER" /usr/local/bin/bpf-linker-real
+          sudo mv /tmp/bpf-linker-wrapper /usr/local/bin/bpf-linker
+
+      # ---------- 系统依赖 ----------
       - name: Install system dependencies (clang, lld)
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld
 
+      # ---------- 设置环境变量（备选） ----------
+      - name: Set environment for bpf-linker
+        run: echo "BPF_LINKER_OPT_LEVEL=2" >> $GITHUB_ENV
+
+      # ---------- 构建 ----------
       - name: Run xtask build
         run: cargo xtask build
 
+      # ---------- 上传产物 ----------
       - name: Get Artifact Name
         id: artifact-name
         run: |
